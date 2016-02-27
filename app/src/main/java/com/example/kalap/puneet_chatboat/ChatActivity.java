@@ -1,5 +1,6 @@
 package com.example.kalap.puneet_chatboat;
 
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -44,16 +45,29 @@ public class ChatActivity extends AppCompatActivity {
     public void sendMessage(View view){
         RequestQueue queue = Volley.newRequestQueue(this);
         final String message = getText.getText().toString();
+        Drawable sent = getResources().getDrawable(R.drawable.bubble_a);
+        final Drawable receive = getResources().getDrawable(R.drawable.bubble_b);
         TextView tvS = new TextView(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            tvS.setBackground(sent);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             tvS.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
         }
         tvS.setText(message);
+        tvS.setTextSize(20);
         display.addView(tvS);
         String url = "http://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&chatBotID=63906" +
                 "&message="+ message +"&externalID=chirag1";
 
         final TextView tvR = new TextView(this);
+        tvR.setTextSize(20);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            tvR.setBackground(receive);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            tvR.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+        }
 
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
                 new Response.Listener<JSONObject>() {
@@ -65,7 +79,7 @@ public class ChatActivity extends AppCompatActivity {
                             jsonObject = response.getJSONObject("message");
                             message = jsonObject.getString("message");
                         } catch (JSONException e) {
-                            e.printStackTrace();
+                            Log.i("BOTREPLY",e.getMessage());
                         }
                         tvR.setText(message);
                         display.addView(tvR);
