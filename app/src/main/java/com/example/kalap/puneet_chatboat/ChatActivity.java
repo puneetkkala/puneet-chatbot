@@ -1,5 +1,9 @@
 package com.example.kalap.puneet_chatboat;
 
+import android.content.ContentValues;
+import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -27,6 +31,8 @@ public class ChatActivity extends AppCompatActivity {
     private List<BotAppMessage> messageList;
     private MessageAdapter messageAdapter;
     EditText getText;
+    private BotMessageDbHelper messageDbHelper;
+    private SQLiteDatabase database;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +42,7 @@ public class ChatActivity extends AppCompatActivity {
         getText = (EditText) findViewById(R.id.getText);
 
         messageList = new ArrayList<>();
+        populateList();
         messageAdapter = new MessageAdapter(messageList, getApplicationContext());
 
         RecyclerView cardList = (RecyclerView) findViewById(R.id.cardList);
@@ -54,6 +61,46 @@ public class ChatActivity extends AppCompatActivity {
 
     }
 
+    public void populateList(){
+        messageDbHelper = new BotMessageDbHelper(getApplicationContext());
+        database = messageDbHelper.getReadableDatabase();
+
+        String[] projection = {
+                BotMessageDbHelper.COLUMN_TYPE,
+                BotMessageDbHelper.COLUMN_CONTENT
+        };
+
+        Cursor c = database.query(
+                BotMessageDbHelper.TABLE_NAME,
+                projection,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        c.moveToFirst();
+        while (!c.isAfterLast()){
+            BotAppMessage bam = new BotAppMessage(
+                    c.getString(c.getColumnIndex(BotMessageDbHelper.COLUMN_CONTENT)),
+                    c.getString(c.getColumnIndex(BotMessageDbHelper.COLUMN_TYPE))
+            );
+            messageList.add(bam);
+            c.moveToNext();
+        }
+    }
+
+    public void addToDatabase(BotAppMessage bam){
+        database = messageDbHelper.getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put(BotMessageDbHelper.COLUMN_TYPE, bam.getType());
+        values.put(BotMessageDbHelper.COLUMN_CONTENT, bam.getContent());
+
+        database.insert(BotMessageDbHelper.TABLE_NAME,null,values);
+    }
+
     public void sendMessage(View view) {
 
 //        ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -63,6 +110,7 @@ public class ChatActivity extends AppCompatActivity {
         BotAppMessage appMessage = new BotAppMessage(getText.getText().toString(),"S");
         messageList.add(appMessage);
         messageAdapter.notifyDataSetChanged();
+        addToDatabase(appMessage);
         String url = "http://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&chatBotID=63906" +
                         "&message=" + appMessage.getContent() + "&externalID=chirag1";
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
@@ -76,6 +124,7 @@ public class ChatActivity extends AppCompatActivity {
                         appMessage1 = new BotAppMessage(jsonObject.getString("message"),"R");
                         messageList.add(appMessage1);
                         messageAdapter.notifyDataSetChanged();
+                        addToDatabase(appMessage1);
                     } catch (JSONException e) {
                         Log.i("BOTREPLY", e.getMessage());
                     }
