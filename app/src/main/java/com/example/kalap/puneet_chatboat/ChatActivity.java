@@ -1,21 +1,13 @@
 package com.example.kalap.puneet_chatboat;
 
-import android.content.ContentValues;
-import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.graphics.drawable.Drawable;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
-import android.os.Build;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -27,64 +19,32 @@ import com.android.volley.toolbox.Volley;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ChatActivity extends AppCompatActivity {
 
+    private List<BotAppMessage> messageList;
+    private MessageAdapter messageAdapter;
     EditText getText;
-    LinearLayout display;
-    static int num = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
-        ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
-
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
         ImageButton sendMessage = (ImageButton) findViewById(R.id.sendMessage);
         getText = (EditText) findViewById(R.id.getText);
-        display = (LinearLayout) findViewById(R.id.display);
-        ChatDatabase chatDatabase = new ChatDatabase(getApplicationContext());
-        SQLiteDatabase db = chatDatabase.getReadableDatabase();
-        String[] projection = {ChatDatabase.MESSAGE, ChatDatabase.MESSAGE_TYPE};
-        Cursor cursor = db.query(
-                ChatDatabase.TABLE_NAME,
-                projection,
-                null,
-                null,
-                null,
-                null,
-                ChatDatabase.MESSAGE_ID
-        );
-        cursor.moveToFirst();
-        while (!cursor.isAfterLast()) {
-            String type = cursor.getString(cursor.getColumnIndex(ChatDatabase.MESSAGE_TYPE));
-            String message = cursor.getString(cursor.getColumnIndex(ChatDatabase.MESSAGE));
-            TextView tvS = new TextView(getApplicationContext());
-            Drawable sent = getResources().getDrawable(R.drawable.bubble_a);
-            final Drawable receive = getResources().getDrawable(R.drawable.bubble_b);
-            if (type.equals("sent")) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    tvS.setBackground(sent);
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    tvS.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
-                }
-            }
-            if (type.equals("received")) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    tvS.setBackground(receive);
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    tvS.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-                }
-            }
-            tvS.setText(message);
-            tvS.setTextSize(20);
-            display.addView(tvS);
-            cursor.moveToNext();
-        }
+
+        messageList = new ArrayList<>();
+        messageAdapter = new MessageAdapter(messageList, getApplicationContext());
+
+        RecyclerView cardList = (RecyclerView) findViewById(R.id.cardList);
+        cardList.setHasFixedSize(true);
+        LinearLayoutManager llm = new LinearLayoutManager(this);
+        llm.setOrientation(LinearLayoutManager.VERTICAL);
+        cardList.setLayoutManager(llm);
+        cardList.setAdapter(messageAdapter);
+
         sendMessage.setOnClickListener(new ImageButton.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -96,155 +56,39 @@ public class ChatActivity extends AppCompatActivity {
 
     public void sendMessage(View view) {
 
-        ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
-
-        ChatDatabase chatDatabase = new ChatDatabase(getApplicationContext());
-        SQLiteDatabase db = chatDatabase.getWritableDatabase();
-
-        if (isConnected) {
-            processUnprocessed();
-            RequestQueue queue = Volley.newRequestQueue(this);
-
-            final String message = getText.getText().toString();
-            ContentValues values = new ContentValues();
-            values.put(ChatDatabase.MESSAGE_ID, num++);
-            values.put(ChatDatabase.MESSAGE, message);
-            values.put(ChatDatabase.MESSAGE_TYPE, "sent");
-            db.insert(ChatDatabase.TABLE_NAME, null, values);
-
-            Drawable sent = getResources().getDrawable(R.drawable.bubble_a);
-            final Drawable receive = getResources().getDrawable(R.drawable.bubble_b);
-            TextView tvS = new TextView(this);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) tvS.setBackground(sent);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1)
-                tvS.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
-            tvS.setText(message);
-            tvS.setTextSize(20);
-            display.addView(tvS);
-
-            String url = "http://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&chatBotID=63906" +
-                    "&message=" + message + "&externalID=chirag1";
-
-            final TextView tvR = new TextView(this);
-            tvR.setTextSize(20);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                tvR.setBackground(receive);
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                tvR.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-            }
-
-            JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
-                    new Response.Listener<JSONObject>() {
-                        @Override
-                        public void onResponse(JSONObject response) {
-                            ChatDatabase chatDatabase = new ChatDatabase(getApplicationContext());
-                            SQLiteDatabase db = chatDatabase.getWritableDatabase();
-                            String message = "";
-                            JSONObject jsonObject;
-                            try {
-                                jsonObject = response.getJSONObject("message");
-                                message = jsonObject.getString("message");
-                            } catch (JSONException e) {
-                                Log.i("BOTREPLY", e.getMessage());
-                            }
-                            ContentValues values = new ContentValues();
-                            values.put(ChatDatabase.MESSAGE_ID, num++);
-                            values.put(ChatDatabase.MESSAGE, message);
-                            values.put(ChatDatabase.MESSAGE_TYPE, "received");
-                            db.insert(ChatDatabase.TABLE_NAME, null, values);
-                            tvR.setText(message);
-                            display.addView(tvR);
-                        }
-                    },
-                    new Response.ErrorListener() {
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
-                            Log.i("BOTREPLY", error.getMessage());
-                        }
-                    }
-            );
-            queue.add(jsonObjectRequest);
-            getText.setText("");
-        } else {
-            final String message = getText.getText().toString();
-            ContentValues values = new ContentValues();
-            values.put(ChatDatabase.MESSAGE_ID, num++);
-            values.put(ChatDatabase.MESSAGE, message);
-            values.put(ChatDatabase.MESSAGE_TYPE, "unprocessed");
-            db.insert(ChatDatabase.TABLE_NAME, null, values);
-            Drawable sent = getResources().getDrawable(R.drawable.bubble_a);
-            TextView tvS = new TextView(this);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) tvS.setBackground(sent);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1)
-                tvS.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
-            tvS.setText(message);
-            tvS.setTextSize(20);
-            display.addView(tvS);
-        }
-    }
-
-    public void processUnprocessed() {
-        ChatDatabase chatDatabase = new ChatDatabase(getApplicationContext());
-        SQLiteDatabase db = chatDatabase.getReadableDatabase();
-        String[] projection = {ChatDatabase.MESSAGE_ID, ChatDatabase.MESSAGE, ChatDatabase.MESSAGE_TYPE};
-        Cursor cursor = db.query(
-                ChatDatabase.TABLE_NAME,
-                projection,
-                null,
-                null,
-                null,
-                null,
-                ChatDatabase.MESSAGE_ID
-        );
-        cursor.moveToFirst();
-        String url = "";
+//        ConnectivityManager cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+//        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+//        boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
         RequestQueue queue = Volley.newRequestQueue(this);
-        while (!cursor.isAfterLast()) {
-            final String id = cursor.getString(cursor.getColumnIndex(ChatDatabase.MESSAGE_ID));
-            String type = cursor.getString(cursor.getColumnIndex(ChatDatabase.MESSAGE_TYPE));
-            if (type.equals("unprocessed")) {
-                String message = cursor.getString(cursor.getColumnIndex(ChatDatabase.MESSAGE));
-                url = "http://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&chatBotID=63906" +
-                        "&message=" + message + "&externalID=chirag1";
-                JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
-                        new Response.Listener<JSONObject>() {
-                            @Override
-                            public void onResponse(JSONObject response) {
-                                ChatDatabase chatDatabase = new ChatDatabase(getApplicationContext());
-                                SQLiteDatabase db = chatDatabase.getWritableDatabase();
-                                String message = "";
-                                JSONObject jsonObject;
-                                try {
-                                    jsonObject = response.getJSONObject("message");
-                                    message = jsonObject.getString("message");
-                                } catch (JSONException e) {
-                                    Log.i("BOTREPLY", e.getMessage());
-                                }
-                                ContentValues values = new ContentValues();
-                                values.put(ChatDatabase.MESSAGE_ID, num++);
-                                values.put(ChatDatabase.MESSAGE, message);
-                                values.put(ChatDatabase.MESSAGE_TYPE, "received");
-                                db.insert(ChatDatabase.TABLE_NAME, null, values);
-
-                                ContentValues values1 = new ContentValues();
-                                values1.put(ChatDatabase.MESSAGE_ID, id);
-                                values1.put(ChatDatabase.MESSAGE, message);
-                                values1.put(ChatDatabase.MESSAGE_TYPE, "sent");
-                                db.update(ChatDatabase.TABLE_NAME, values1, ChatDatabase.MESSAGE_ID, new String[]{String.valueOf(id)});
-                            }
-                        },
-                        new Response.ErrorListener() {
-                            @Override
-                            public void onErrorResponse(VolleyError error) {
-                                Log.i("BOTREPLY", error.getMessage());
-                            }
-                        }
-                );
-                queue.add(jsonObjectRequest);
+        BotAppMessage appMessage = new BotAppMessage(getText.getText().toString(),"S");
+        messageList.add(appMessage);
+        messageAdapter.notifyDataSetChanged();
+        String url = "http://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&chatBotID=63906" +
+                        "&message=" + appMessage.getContent() + "&externalID=chirag1";
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null,
+            new Response.Listener<JSONObject>() {
+                @Override
+                public void onResponse(JSONObject response) {
+                    BotAppMessage appMessage1;
+                    JSONObject jsonObject;
+                    try {
+                        jsonObject = response.getJSONObject("message");
+                        appMessage1 = new BotAppMessage(jsonObject.getString("message"),"R");
+                        messageList.add(appMessage1);
+                        messageAdapter.notifyDataSetChanged();
+                    } catch (JSONException e) {
+                        Log.i("BOTREPLY", e.getMessage());
+                    }
+                }
+            },
+            new Response.ErrorListener() {
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    Log.i("BOTREPLY", error.getMessage());
+                }
             }
-        }
+        );
+        queue.add(jsonObjectRequest);
+        getText.setText("");
     }
 }
